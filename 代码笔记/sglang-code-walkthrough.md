@@ -1,5 +1,7 @@
 ### Sglang Code Walkthrough
 
+*2025.12.22*
+
 ![总体流程](../图片/sglang-architecture.svg)
 
 | 步骤 | 执行者（谁）                  | 动作（干什么）                       | 作用（为什么）                                               |
@@ -192,9 +194,119 @@ TokenizerManager **自己并不“攒包”**，它收到一次 `generate_reques
 | **metrics**                       | Prometheus 格式的 **计数器/直方图** 集合（token 数、延迟、队列长度） | 让运维看面板：每秒处理多少 token、平均延迟多少，方便做告警和弹性伸缩。 |
 | **多模态图像处理器 placeholders** | 提前把 `CLIPImageProcessor` 或 `Qwen-VL 视觉编码器` 实例化好，占个坑 | 后面收到带图片的请求时，可直接调用，不必临时加载模型，减少首包延迟。 |
 
+*2025.12.23*
 
+`run_scheduler_process`负责在子进程里把真正的火锅店长`Scheduler`实例化并开机。`run_scheduler_process`是入口函数（在主进程里被`launch_engine`用`multiprocessing.Process`拉起，函数里直接`scheduler = Scheduler(...)`然后`scheduler.run()`
 
+**分词器**=`tokenizer`（HuggingFace 的`AutoTokenizer`）负责把字符串→List[int]。
+**处理器**=多模态时用，如`CLIPImageProcessor`把图片→张量，或Qwen-VL的视觉编码器。
 
+**ChunkCache**=按固定长度块缓存，简单但可能重复存。
+**RadixCache**=前缀树共享，相同前缀只存一次，省显存。
+SGLang默认启用RadixCache；ChunkCache只在旧版本或调试开关可见，二者**不会同时开**，Radix优先。
 
+SchedulePolicy是Scheduler里的拼桌策略类。每轮按`max_batch_size`、`max_tokens`、`waiting time`等打分，挑一组请求下锅。平衡吞吐与延迟，实现“先来的先吃+能拼就拼”。
 
+chunk prefill是prefill的一种方式吗？
+**是**。它把**超长提示**切成≤chunk_size的小段，逐段extend，避免一次占爆显存。
+**vs普通prefill**：普通prefill一次性算整句；chunk prefill=“分段extend再拼接KV”，仍是extend内核。
+
+GrammarBackend
+一个与Scheduler同级的服务进程。接收constraint请求→编译语法→每步给Scheduler返回合法token掩码。
+让constraint decoding有“合法字典”，保证输出100%合规JSON/正则等。
+
+constraint decoding
+每步只从符合语法（JSON、正则、EBNF）的候选token里采样，让模型输出必定满足格式，如{"name":"...","age":...}不会缺括号。
+
+关于prefill和decode概念，可以看[LLM Inference at scale with TGI](https://huggingface.co/blog/martinigoyanes/llm-inference-at-scale-with-tgi)前半部分。
+TGI：Text Generation Inference（*TGI*）是HuggingFace推出的*大模型*推理部署框架
+
+明确一些概念：
+*"forward = 给定输入，计算输出的整个过程"*
+Tokenizer 分词 + 转成数字(token_ids)，Embedding 查表转成向量
+
+“Ragged Tensors 增量更新现有的 KV-Cache”问了gpt半天，依然没懂，回头细看吧。
+
+### TpModelWorker 管理 forward pass 和 token sampling (TpModelWorker Manage Forward and Token Sampling)
+
+embedding 请求就是“我不要模型继续写字，**只要它给我一段向量**”——相当于让模型当“特征提取器”。
+
+### ModelRunner 管理模型执行 (ModelRunner Manages Model Execution)
+
+**空闲** = 暂时没有用户请求，但 GPU 不能晾着；系统故意跑‘空锅’前向，用来**预热权重、刷 metrics、占住 CUDA 流，防止驱动降频**。
+
+- **防降频**：GPU 空闲久了驱动会降功耗，下次真来请求时热身慢→首包延迟飙高。
+- **保持 CUDA context 热**：权重一直留在寄存器/L2，不被换出。
+- **顺手刷 metrics**：空跑也能测一次端到端 latency、带宽占用，方便面板显示“健康心跳”。
+- **占流防抢占**：让 CUDA stream 一直有任务，避免其他进程插进来占资源。
+
+### Model 加载权重并执行前向传递 (Model Load Weights and Perform Forward)
+
+`lm_head` 就是 **最后一层线性投影**（权重形状 `[hidden_size, vocab_size]`），把每个 token 的隐藏向量乘一次矩阵 → 得到该位置在词表上的 logits 分数。
+
+`pooler` 只在 **embedding/reward 任务** 被调用，对最后一层 hidden states 做平均或取最后一个 token，再投影到 `[batch, embed_dim]` 返回。
+
+### AttentionBackend 加速模型前向传递 (AttentionBackend Accelerate Model Forward)
+
+sliding window：只让 token 看「左边固定 W 个 token」的局部 attention（减少长文计算量）。
+cross-attention：decoder  token 去 attend encoder 特征（多模态或 encoder-decoder 模型才用）。
+
+metadata：元数据
+
+CUDA Graph = GPU 的"宏录制"功能
+把多个CUDA操作录下来，以后一键执行，大幅减少开销
+
+```
+# CPU 不断给 GPU 下指令
+for 每个批次 in 数据:
+    # 1. CPU: 启动kernel1
+    kernel1<<<...>>>(...)
+    
+    # 2. CPU等待GPU完成
+    cudaDeviceSynchronize()
+    
+    # 3. CPU: 启动kernel2
+    kernel2<<<...>>>(...)
+    
+    # 4. 又等待...
+    cudaDeviceSynchronize()
+    
+# 问题：CPU-GPU 频繁通信，大量时间浪费在"对话"上
+```
+
+FlashInfer wrapper
+**C++ 类对象**，把 kernel 参数、workspace、调度逻辑包成“一键启动器”，让上层代码一句 `wrapper.run()` 就能调对 kernel。
+
+prefix extension 是什么？
+
+- 场景：旧前缀 `"The weather"` 已缓存，用户继续 `" is fine today"`。
+- 工作：只算 `" is fine today"` 这段新 token 的 extend，旧 KV 直接索引不再计算。
+- 结果：节点仍挂在 radix 树原前缀下，**物理上形成“旧块 + 新块”链条**；下次若再扩，继续只算新增即可。
+- 与 ragged/paged 关系：
+  - 旧块 → 必然 paged（已固定块化）
+  - 新块 → 根据新 token 量选 ragged 或 paged
+    → 所以 prefix extension 既可能走 paged 也可能走 ragged，只看“新增量”大小。
+
+`indices_updater_prefill`更新索引：这个索引是 **“GPU 端 KV-Cache 物理地址索引”**，也就是告诉 CUDA kernel：“每条序列的新 token 该写到哪块显存、该从哪块旧显存读 KV”。
+
+### DetokenizerManager 进行解码并发送回 TokenizerManager (DetokenizerManager Detokenize and Send to TokenizerManager)
+
+为什么整理输出还要 metadata？
+
+纯文本缺少 API 规定的字段：
+
+- `finish_reason`：stop / length / content_filter
+
+- `logprobs`：每个 token 的 -log(p)
+- `usage`：prompt_tokens / completion_tokens
+
+这些信息在 **Scheduler 阶段就已算好**并随 `BatchTokenIDOut` 一起发到 DetokenizerManager；
+最后必须把 **文本 + 上述结构化数据** 合体成 `BatchStrOut`，否则前端无法构造符合 OpenAI 规范的 JSON 响应。
+
+surr_ids 到底是什么？
+当用户一次要 **n=3** 份答案（或 beam=3）时，同一段 token 序列会出现 **3 条略微不同的分支**。
+DetokenizerManager 把它们扁平成一整条 `token_ids = [branch1; branch2; branch3]` 一起发过来；
+`read_ids` = 真正要解码的主分支（或第一条），
+`surr_ids` = 其余 **并行/候选分支**的 ID 数组。
+用 **batch_decode** 一次性反编码整串，比多次调用快；解码后再按长度切回去即可。
 
