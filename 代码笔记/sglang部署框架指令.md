@@ -208,3 +208,88 @@ python3 -m http.server 3000
 # 访问 http://localhost:3000
 ```
 
+### 指令含义
+
+```bash
+python3 -m sglang.launch_server \
+    --model-path /root/.cache/huggingface/DeepSeek-R1-Distill-Qwen-1.5B \
+    --host 0.0.0.0 \
+    --port 30000
+```
+
+-m是 Python 模块执行参数，全称是 module
+
+-m 会从 Python 的模块搜索路径中查找并运行模块
+
+```bash
+# 方式1：直接运行脚本
+python3 script.py
+
+# 方式2：运行模块（-m 方式）
+python3 -m module_name
+# -m 会从 Python 的模块搜索路径中查找并运行模块
+```
+
+参数查看：
+
+```bash
+# 查看所有参数
+python3 -m sglang.launch_server --help
+
+# 查看特定模块
+python3 -m sglang.bench_one_batch --help
+python3 -m sglang.bench_serving --help
+python3 -m sglang.chat --help
+```
+
+```bash
+python3 -m sglang.launch_server --help
+1. 模型加载相关 (1-20)
+2. 服务器配置 (21-25)
+3. 推理配置 (26-50)
+4. 性能优化 (51-100)
+5. 调度策略 (101-120)
+6. 缓存和内存 (121-140)
+7. 设备并行 (141-155)
+8. 日志和监控 (156-190)
+9. API和模板 (191-210)
+10. 工具和解析器 (211-230)
+11. LoRA支持 (231-250)
+12. 内核后端 (251-280)
+13. 推测解码 (281-320)
+14. MoE专家并行 (321-380)
+15. 缓存和存储 (381-410)
+16. 特殊优化 (411-480)
+17. 调试和诊断 (481-500)
+```
+
+### 轻量化启动
+
+```bash
+python3 -m sglang.launch_server \
+--model-path /root/.cache/huggingface/DeepSeek-R1-Distill-Qwen-1.5B \
+--mem-fraction-static 0.9 \
+--max-total-tokens 80 \
+--max-running-requests 1 \
+--dtype half \
+--host 0.0.0.0 \
+--port 30000
+```
+
+### MOE的Qwen3-30B-A3B-GPTQ-Int4
+
+```bash
+python3 -m sglang.launch_server \
+    --model-path /root/.cache/huggingface/Qwen3-30B-A3B-GPTQ-Int4 \
+    --host 0.0.0.0 \
+    --port 30000 \
+    --offload-mode=cpu \
+    --offload-group-size=512 \
+    --context-length=8 \
+    --mem-fraction-static 0.9 \
+    --dtype half \
+    --max-running-requests 1
+    
+```
+
+*失败，无法本地部署*

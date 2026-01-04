@@ -140,3 +140,175 @@ rmdir 目录名
 rm -r 目录名
 ```
 
+### 剪切/移动命令
+
+```bash
+# 剪切单个文件
+mv 源文件 目标目录/
+
+# 示例：
+mv 笔记.txt ~/文档/
+# 将"笔记.txt"移动到"文档"文件夹
+```
+
+```bash
+# 剪切多个文件
+mv 文件1 文件2 文件3 目标目录/
+
+# 示例：
+mv 图片1.jpg 图片2.png ~/图片/
+```
+
+```bash
+# 剪切整个目录
+mv 源目录 目标目录/
+
+# 示例：
+mv 项目文件夹 ~/工作/
+```
+
+### 程序卸载
+
+```bash
+# 卸载nsight-systems（包含nsys-ui）
+sudo apt remove --purge nsight-systems
+
+# 或者使用更彻底的卸载
+sudo apt autoremove --purge nsight-systems
+```
+
+**命令1：普通删除**
+
+```bash
+
+sudo apt remove nsight-systems
+```
+
+**作用**：只卸载程序文件，**保留配置文件**
+
+**比喻**：搬家时只搬走家具，但**留下房间的布置图纸**
+
+**命令2：彻底删除**
+
+```bash
+
+sudo apt remove --purge nsight-systems
+```
+
+**作用**：卸载程序文件**并且删除配置文件**
+
+**比喻**：搬家时**家具和布置图纸一起清空**
+
+**实际删除的内容对比**：
+
+```bash
+
+# 假设nsight-systems安装在以下位置：
+
+# 1. 程序文件（两种方式都删除）
+/usr/bin/nsys
+/usr/bin/nsight-sys
+/opt/nvidia/nsight-systems/
+
+# 2. 配置文件（只有--purge会删除）
+/etc/nsight-systems/              # 系统配置
+~/.config/nsight-systems/         # 用户配置
+~/.cache/nsight-systems/          # 缓存文件
+~/.local/share/nsight-systems/    # 用户数据
+```
+
+**autoremove的作用：**
+
+```bash
+sudo apt autoremove --purge nsight-systems
+└──┬─── └──┬────── └─┬─── └──────┬──────
+   │       │         │           └── 要删除的包
+   │       │         └── 彻底删除（含配置）
+   │       └── 自动删除不需要的依赖
+   └── 管理员权限
+```
+
+删除为这个包安装的依赖包，但这些依赖现在没有被其他包使用。
+比喻：不仅拆房子，还清理建筑垃圾
+
+### 解压缩包
+
+```bash
+sudo dpkg -i nsight-systems-2025.5.1_2025.5.1.121-1_amd64.deb
+```
+
+选项：-i (install，安装)
+
+| 操作           | dpkg命令         | apt命令                   | 说明             |
+| -------------- | ---------------- | ------------------------- | ---------------- |
+| **安装本地包** | `dpkg -i 包.deb` | `apt install ./包.deb`    | 安装本地.deb文件 |
+| **卸载包**     | `dpkg -r 包名`   | `apt remove 包名`         | 移除包但保留配置 |
+| **彻底卸载**   | `dpkg -P 包名`   | `apt remove --purge 包名` | 完全移除         |
+| **查询已安装** | `dpkg -l`        | `apt list --installed`    | 查看已安装包     |
+| **查看包信息** | `dpkg -I 包.deb` | -                         | 查看包信息       |
+
+### 调节屏幕亮度
+
+[ubuntu调节屏幕亮度方法](https://blog.csdn.net/snoop_doog/article/details/149164339)
+
+```bash
+nvidia-settings
+```
+
+打开nvidia设置，然后进入GPU 0 --> DP-0 --> Color Correction就可以调节屏幕亮度了
+
+### 修改环境变量
+
+临时修改
+
+```bash
+export DISPLAY=:0
+# 例如，设置PATH环境变量
+export PATH=$PATH:/your/new/path
+```
+
+永久修改环境变量
+
+```bash
+# 修改~/.bashrc或~/.bash_profile文件
+nano ~/.bashrc  # 或使用你喜欢的文本编辑器
+
+# 在文件的末尾添加你的环境变量设置：
+export VAR_NAME="value"
+export PATH=$PATH:/your/new/path
+
+# 保存并关闭文件，使更改生效
+source ~/.bashrc  # 或重新登录你的会话
+```
+
+### 看ubuntu内核版本
+
+可以查看`/proc/version`文件来获取内核版本信息：
+
+```bash
+cat /proc/version
+```
+
+对于使用systemd的系统（如Ubuntu 16.04及以后版本），可以使用`hostnamectl`命令来查看内核版本：
+
+```bash
+hostnamectl
+```
+
+### 截图快捷键
+
+shift+print
+
+### 改文件夹名
+
+```bash
+mv old_folder new_folder
+```
+
+这将把名为old_folder的文件夹重命名为new_folder
+
+```bash
+rename 's/old_folder/new_folder/' *
+```
+
+这将在当前目录下将所有文件夹名中的old_folder替换为new_folder。

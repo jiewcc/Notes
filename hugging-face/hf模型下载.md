@@ -116,5 +116,7 @@ Example:
 - `--dataset`：指定下载数据集。
 - `--tool aria2c` 和 `-x 4`：同上，使用 `aria2c` 进行多线程下载。
 
-
+```bash
+./hfd.sh anon8231489123/ShareGPT_Vicuna_unfiltered --dataset --tool aria2c -x 4
+```
 

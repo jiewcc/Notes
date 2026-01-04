@@ -240,3 +240,9 @@ docker container prune
 docker container prune -f
 ```
 
+### 停止容器
+
+```bash
+docker stop 容器名  # 优雅停止
+```
+
