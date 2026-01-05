@@ -186,3 +186,269 @@ for k in ["num_experts_per_tok","router_top_k","moe_top_k","num_local_experts","
 PY
 ```
 
+
+
+### 云端源码运行
+
+```bash
+export SGLANG_MOE_FUSE_DOWN_SUM_REDUCE=1 
+```
+
+```bash
+bash scripts/launch_server_from_source.sh --model-path /model/HuggingFace/openai/gpt-oss-20b --host 0.0.0.0 --port 30000
+```
+
+```bash
+python -m sglang.bench_serving --backend sglang --host 127.0.0.1 --port 30000 --dataset-name sharegpt --dataset-path /root/model-download/hfd/ShareGPT_Vicuna_unfiltered/ShareGPT_V3_unfiltered_cleaned_split.json --num-prompts 100 --request-rate 20 --max-concurrency 64 --seed 0 --warmup-requests 50
+```
+
+
+
+**融合前**
+
+```bash
+#Input tokens: 33694
+#Output tokens: 19062
+============ Serving Benchmark Result ============
+Backend:                                 sglang    
+Traffic request rate:                    20.0      
+Max request concurrency:                 64        
+Successful requests:                     100       
+Benchmark duration (s):                  67.53     
+Total input tokens:                      33694     
+Total input text tokens:                 33694     
+Total input vision tokens:               0         
+Total generated tokens:                  19062     
+Total generated tokens (retokenized):    18900     
+Request throughput (req/s):              1.48      
+Input token throughput (tok/s):          498.98    
+Output token throughput (tok/s):         282.29    
+Peak output token throughput (tok/s):    1205.00   
+Peak concurrent requests:                71        
+Total token throughput (tok/s):          781.27    
+Concurrency:                             49.65     
+----------------End-to-End Latency----------------
+Mean E2E Latency (ms):                   33525.41  
+Median E2E Latency (ms):                 33275.16  
+---------------Time to First Token----------------
+Mean TTFT (ms):                          6465.07   
+Median TTFT (ms):                        7866.46   
+P99 TTFT (ms):                           14051.11  
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          532.97    
+Median TPOT (ms):                        200.21    
+P99 TPOT (ms):                           5450.87   
+---------------Inter-Token Latency----------------
+Mean ITL (ms):                           142.71    
+Median ITL (ms):                         51.82     
+P95 ITL (ms):                            677.33    
+P99 ITL (ms):                            2200.30   
+Max ITL (ms):                            15796.54  
+==================================================
+```
+
+```bash
+============ Serving Benchmark Result ============
+Backend:                                 sglang    
+Traffic request rate:                    20.0      
+Max request concurrency:                 64        
+Successful requests:                     100       
+Benchmark duration (s):                  31.04     
+Total input tokens:                      33694     
+Total input text tokens:                 33694     
+Total input vision tokens:               0         
+Total generated tokens:                  19062     
+Total generated tokens (retokenized):    18877     
+Request throughput (req/s):              3.22      
+Input token throughput (tok/s):          1085.45   
+Output token throughput (tok/s):         614.08    
+Peak output token throughput (tok/s):    1120.00   
+Peak concurrent requests:                73        
+Total token throughput (tok/s):          1699.54   
+Concurrency:                             32.93     
+----------------End-to-End Latency----------------
+Mean E2E Latency (ms):                   10222.04  
+Median E2E Latency (ms):                 9397.25   
+---------------Time to First Token----------------
+Mean TTFT (ms):                          138.11    
+Median TTFT (ms):                        144.88    
+P99 TTFT (ms):                           165.29    
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          72.00     
+Median TPOT (ms):                        63.04     
+P99 TPOT (ms):                           215.57    
+---------------Inter-Token Latency----------------
+Mean ITL (ms):                           53.18     
+Median ITL (ms):                         52.48     
+P95 ITL (ms):                            106.03    
+P99 ITL (ms):                            220.76    
+Max ITL (ms):                            559.62    
+==================================================
+```
+
+```bash
+============ Serving Benchmark Result ============
+Backend:                                 sglang    
+Traffic request rate:                    20.0      
+Max request concurrency:                 64        
+Successful requests:                     100       
+Benchmark duration (s):                  30.86     
+Total input tokens:                      33694     
+Total input text tokens:                 33694     
+Total input vision tokens:               0         
+Total generated tokens:                  19062     
+Total generated tokens (retokenized):    18506     
+Request throughput (req/s):              3.24      
+Input token throughput (tok/s):          1091.95   
+Output token throughput (tok/s):         617.76    
+Peak output token throughput (tok/s):    1122.00   
+Peak concurrent requests:                73        
+Total token throughput (tok/s):          1709.71   
+Concurrency:                             32.57     
+----------------End-to-End Latency----------------
+Mean E2E Latency (ms):                   10051.19  
+Median E2E Latency (ms):                 9234.31   
+---------------Time to First Token----------------
+Mean TTFT (ms):                          138.15    
+Median TTFT (ms):                        145.13    
+P99 TTFT (ms):                           177.52    
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          67.99     
+Median TPOT (ms):                        62.97     
+P99 TPOT (ms):                           150.62    
+---------------Inter-Token Latency----------------
+Mean ITL (ms):                           52.28     
+Median ITL (ms):                         51.67     
+P95 ITL (ms):                            104.85    
+P99 ITL (ms):                            216.22    
+Max ITL (ms):                            486.56    
+==================================================
+```
+
+**融合后**
+
+```bash
+============ Serving Benchmark Result ============
+Backend:                                 sglang    
+Traffic request rate:                    20.0      
+Max request concurrency:                 64        
+Successful requests:                     100       
+Benchmark duration (s):                  43.71     
+Total input tokens:                      33694     
+Total input text tokens:                 33694     
+Total input vision tokens:               0         
+Total generated tokens:                  19062     
+Total generated tokens (retokenized):    18894     
+Request throughput (req/s):              2.29      
+Input token throughput (tok/s):          770.93    
+Output token throughput (tok/s):         436.15    
+Peak output token throughput (tok/s):    1118.00   
+Peak concurrent requests:                72        
+Total token throughput (tok/s):          1207.08   
+Concurrency:                             42.11     
+----------------End-to-End Latency----------------
+Mean E2E Latency (ms):                   18404.39  
+Median E2E Latency (ms):                 17447.91  
+---------------Time to First Token----------------
+Mean TTFT (ms):                          2831.31   
+Median TTFT (ms):                        3059.50   
+P99 TTFT (ms):                           8025.14   
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          338.55    
+Median TPOT (ms):                        100.31    
+P99 TPOT (ms):                           4463.43   
+---------------Inter-Token Latency----------------
+Mean ITL (ms):                           82.13     
+Median ITL (ms):                         51.92     
+P95 ITL (ms):                            106.34    
+P99 ITL (ms):                            889.07    
+Max ITL (ms):                            11106.61  
+==================================================
+```
+
+```bash
+============ Serving Benchmark Result ============
+Backend:                                 sglang    
+Traffic request rate:                    20.0      
+Max request concurrency:                 64        
+Successful requests:                     100       
+Benchmark duration (s):                  30.75     
+Total input tokens:                      33694     
+Total input text tokens:                 33694     
+Total input vision tokens:               0         
+Total generated tokens:                  19062     
+Total generated tokens (retokenized):    18880     
+Request throughput (req/s):              3.25      
+Input token throughput (tok/s):          1095.67   
+Output token throughput (tok/s):         619.86    
+Peak output token throughput (tok/s):    1180.00   
+Peak concurrent requests:                73        
+Total token throughput (tok/s):          1715.54   
+Concurrency:                             32.44     
+----------------End-to-End Latency----------------
+Mean E2E Latency (ms):                   9976.52   
+Median E2E Latency (ms):                 9153.00   
+---------------Time to First Token----------------
+Mean TTFT (ms):                          134.76    
+Median TTFT (ms):                        142.04    
+P99 TTFT (ms):                           167.21    
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          66.31     
+Median TPOT (ms):                        62.17     
+P99 TPOT (ms):                           148.48    
+---------------Inter-Token Latency----------------
+Mean ITL (ms):                           51.90     
+Median ITL (ms):                         51.37     
+P95 ITL (ms):                            103.15    
+P99 ITL (ms):                            179.46    
+Max ITL (ms):                            476.47    
+==================================================
+```
+
+```bash
+============ Serving Benchmark Result ============
+Backend:                                 sglang    
+Traffic request rate:                    20.0      
+Max request concurrency:                 64        
+Successful requests:                     100       
+Benchmark duration (s):                  30.95     
+Total input tokens:                      33694     
+Total input text tokens:                 33694     
+Total input vision tokens:               0         
+Total generated tokens:                  19062     
+Total generated tokens (retokenized):    18884     
+Request throughput (req/s):              3.23      
+Input token throughput (tok/s):          1088.63   
+Output token throughput (tok/s):         615.88    
+Peak output token throughput (tok/s):    1113.00   
+Peak concurrent requests:                74        
+Total token throughput (tok/s):          1704.50   
+Concurrency:                             32.57     
+----------------End-to-End Latency----------------
+Mean E2E Latency (ms):                   10080.83  
+Median E2E Latency (ms):                 9218.10   
+---------------Time to First Token----------------
+Mean TTFT (ms):                          136.15    
+Median TTFT (ms):                        142.91    
+P99 TTFT (ms):                           164.91    
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          69.19     
+Median TPOT (ms):                        61.85     
+P99 TPOT (ms):                           196.63    
+---------------Inter-Token Latency----------------
+Mean ITL (ms):                           52.45     
+Median ITL (ms):                         51.69     
+P95 ITL (ms):                            105.37    
+P99 ITL (ms):                            217.63    
+Max ITL (ms):                            491.54    
+==================================================
+```
+
+**分析**
+
+1. 第一次 req/s=1.48 且 P99 TTFT=14s、Max ITL=15.8s：明显像“测量期间发生了几次秒级停顿”（编译/调优/初始化/偶发资源争用），导致队列积压，TTFT 被拉爆。
+2. 第二次 req/s=3.22 且 TTFT/ITL 都很稳定：说明服务已经进入稳定态（shape/kernels/缓存都热了），吞吐接近实际长期能力。
+
+**验证改动是否生效**
+
+SGLANG_MOE_DEBUG_FUSE

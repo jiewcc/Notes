@@ -293,3 +293,21 @@ python3 -m sglang.launch_server \
 ```
 
 *失败，无法本地部署*
+
+### /model/HuggingFace/openai/gpt-oss-20b
+
+moe模型，部署显存占用大概22g，3090可用
+
+```bash
+python3 -m sglang.launch_server \
+    --model-path /model/HuggingFace/openai/gpt-oss-20b \
+    --host 0.0.0.0 \
+    --port 30000
+```
+
+```
+bash scripts/launch_server_from_source.sh --model-path /model/HuggingFace/openai/gpt-oss-20b --host 0.0.0.0 --port 30000
+```
+
+
+
