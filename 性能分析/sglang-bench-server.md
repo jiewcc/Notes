@@ -452,3 +452,466 @@ Max ITL (ms):                            491.54
 **验证改动是否生效**
 
 SGLANG_MOE_DEBUG_FUSE
+
+```bash
+export SGLANG_MOE_DEBUG_FUSE=1
+# 强制改用 fused_moe_triton（若不兼容可能报错或退回）
+bash scripts/launch_server_from_source.sh --model-path /model/HuggingFace/openai/gpt-oss-20b --host 0.0.0.0 --port 30000
+
+bash scripts/launch_server_from_source.sh --moe-runner-backend triton --model-path /model/HuggingFace/openai/gpt-oss-20b --host 0.0.0.0 --port 30000
+```
+
+**更换--moe-runner-backend triton路径启动**
+
+```bash
+export SGLANG_MOE_DEBUG_FUSE=1
+export SGLANG_MOE_FUSE_DOWN_SUM_REDUCE=1
+export PYTORCH_ALLOC_CONF=garbage_collection_threshold:0.6,allocator:cuda_basic
+bash scripts/launch_server_from_source.sh \
+  --moe-runner-backend triton \
+  --model-path /model/HuggingFace/openai/gpt-oss-20b \
+  --cpu-offload-gb 120 \
+  --offload-mode cpu \
+  --mem-fraction-static 0.7 \
+  --cuda-graph-max-bs 16 \
+  --host 0.0.0.0 --port 30000
+```
+
+fp16
+
+```
+export SGLANG_MOE_DEBUG_FUSE=1
+export SGLANG_MOE_FUSE_DOWN_SUM_REDUCE=1
+export PYTORCH_ALLOC_CONF=garbage_collection_threshold:0.6,allocator:cuda_basic
+bash scripts/launch_server_from_source.sh \
+  --moe-runner-backend triton \
+  --model-path /model/HuggingFace/openai/gpt-oss-20b \
+  --dtype float16 \
+  --cpu-offload-gb 120 \
+  --offload-mode cpu \
+  --mem-fraction-static 0.7 \
+  --cuda-graph-max-bs 16 \
+  --host 0.0.0.0 --port 30000
+```
+
+**Trinity-Nano**
+
+```
+bash scripts/launch_server_from_source.sh --model-path /root/model-download/hfd/Trinity-Nano-Base-Pre-Anneal --trust-remote-code --host 0.0.0.0 --port 30000
+```
+
+```
+python3 -m sglang.launch_server --model-path /root/model-download/hfd/Trinity-Nano-Base-Pre-Anneal --trust-remote-code --reasoning-parser deepseek_r1 --host 0.0.0.0 --port 30000
+```
+
+```
+python3 -m sglang.launch_server --model-path /root/model-download/hfd/Trinity-Nano-Base --trust-remote-code --reasoning-parser deepseek-r1 --mem-fraction-static 0.7 --cuda-graph-max-bs 16 --disable-cuda-graph --host 0.0.0.0 --port 30000
+```
+
+*这破模型模型文件自己写的，不走sglang本身的函数，也不用sglang的moe算子*
+
+**重新梳理现状**
+
+sglang能不能用--moe-runner-backend triton来打开gpt-oss-20b，目前输入没有输出的问题，是来自于算子修改，还是模型本身
+
+```
+python3 -m sglang.launch_server \
+    --moe-runner-backend triton \
+    --model-path /model/HuggingFace/openai/gpt-oss-20b \
+    --host 0.0.0.0 \
+    --port 30000
+python3 -m sglang.launch_server \
+  --moe-runner-backend triton \
+  --model-path /model/HuggingFace/openai/gpt-oss-20b \
+  --cpu-offload-gb 120 \
+  --offload-mode cpu \
+  --mem-fraction-static 0.7 \
+  --cuda-graph-max-bs 16 \
+  --host 0.0.0.0 --port 30000
+```
+
+错误位置：
+
+- 错误发生在 `sglang/srt/layers/quantization/mxfp4.py` 文件的第 581 行。
+- 函数 `upcast_from_mxfp()` 被调用时传入了 `dtype` 参数，但该函数的定义中并未声明接受此参数
+
+源码启动，改了这个参数的问题，不启动融合，有没有问题？
+
+```
+export SGLANG_MOE_DEBUG_FUSE=0
+export SGLANG_MOE_FUSE_DOWN_SUM_REDUCE=0
+bash scripts/launch_server_from_source.sh \
+  --moe-runner-backend triton \
+  --model-path /model/HuggingFace/openai/gpt-oss-20b \
+  --dtype float16 \
+  --cpu-offload-gb 120 \
+  --offload-mode cpu \
+  --mem-fraction-static 0.8 \
+  --cuda-graph-max-bs 8 \
+  --host 0.0.0.0 --port 30000
+```
+
+```
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+bash scripts/launch_server_from_source.sh \
+  --moe-runner-backend triton \
+  --model-path /model/HuggingFace/openai/gpt-oss-20b \
+  --max-total-tokens 1024 \
+  --mem-fraction-static 0.7 \
+  --cuda-graph-max-bs 1 \
+  --disable-cuda-graph \
+  --host 0.0.0.0 \
+  --port 30000
+bash scripts/launch_server_from_source.sh \
+  --moe-runner-backend triton \
+  --model-path /model/HuggingFace/openai/gpt-oss-20b \
+  --max-total-tokens 256 \
+  --cuda-graph-max-bs 1 \
+  --host 0.0.0.0 \
+  --port 30000
+```
+
+**/root/model-download/hfd/OLMoE-1B-7B-0125**
+
+```
+export SGLANG_MOE_DEBUG_FUSE=1
+export SGLANG_MOE_FUSE_DOWN_SUM_REDUCE=1
+bash scripts/launch_server_from_source.sh \
+    --model-path /root/model-download/hfd/OLMoE-1B-7B-0125 \
+    --moe-runner-backend triton \
+    --host 0.0.0.0 \
+    --port 30000
+```
+
+```
+python -m sglang.bench_serving --backend sglang --host 127.0.0.1 --port 30000 --dataset-name sharegpt --dataset-path /root/model-download/hfd/ShareGPT_Vicuna_unfiltered/ShareGPT_V3_unfiltered_cleaned_split.json --num-prompts 100 --request-rate 20 --max-concurrency 64 --seed 0 --warmup-requests 50
+```
+
+*好像可以了，下次要选大容量显卡*
+
+```
+============ Serving Benchmark Result ============
+Backend:                                 sglang    
+Traffic request rate:                    20.0      
+Max request concurrency:                 64        
+Successful requests:                     100       
+Benchmark duration (s):                  17.61     
+Total input tokens:                      37136     
+Total input text tokens:                 37136     
+Total input vision tokens:               0         
+Total generated tokens:                  21239     
+Total generated tokens (retokenized):    21228     
+Request throughput (req/s):              5.68      
+Input token throughput (tok/s):          2108.43   
+Output token throughput (tok/s):         1205.86   
+Peak output token throughput (tok/s):    2559.00   
+Peak concurrent requests:                75        
+Total token throughput (tok/s):          3314.29   
+Concurrency:                             28.60     
+----------------End-to-End Latency----------------
+Mean E2E Latency (ms):                   5037.59   
+Median E2E Latency (ms):                 4601.20   
+---------------Time to First Token----------------
+Mean TTFT (ms):                          112.42    
+Median TTFT (ms):                        91.17     
+P99 TTFT (ms):                           416.38    
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          30.32     
+Median TPOT (ms):                        28.12     
+P99 TPOT (ms):                           52.00     
+---------------Inter-Token Latency----------------
+Mean ITL (ms):                           23.30     
+Median ITL (ms):                         20.56     
+P95 ITL (ms):                            41.55     
+P99 ITL (ms):                            152.51    
+Max ITL (ms):                            483.93    
+==================================================
+============ Serving Benchmark Result ============
+Backend:                                 sglang    
+Traffic request rate:                    20.0      
+Max request concurrency:                 64        
+Successful requests:                     100       
+Benchmark duration (s):                  17.06     
+Total input tokens:                      37136     
+Total input text tokens:                 37136     
+Total input vision tokens:               0         
+Total generated tokens:                  21239     
+Total generated tokens (retokenized):    21229     
+Request throughput (req/s):              5.86      
+Input token throughput (tok/s):          2176.25   
+Output token throughput (tok/s):         1244.65   
+Peak output token throughput (tok/s):    2682.00   
+Peak concurrent requests:                72        
+Total token throughput (tok/s):          3420.90   
+Concurrency:                             26.72     
+----------------End-to-End Latency----------------
+Mean E2E Latency (ms):                   4559.49   
+Median E2E Latency (ms):                 4009.48   
+---------------Time to First Token----------------
+Mean TTFT (ms):                          58.05     
+Median TTFT (ms):                        58.07     
+P99 TTFT (ms):                           84.94     
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          25.13     
+Median TPOT (ms):                        24.37     
+P99 TPOT (ms):                           40.54     
+---------------Inter-Token Latency----------------
+Mean ITL (ms):                           21.30     
+Median ITL (ms):                         20.16     
+P95 ITL (ms):                            42.69     
+P99 ITL (ms):                            68.27     
+Max ITL (ms):                            118.26    
+==================================================
+============ Serving Benchmark Result ============
+Backend:                                 sglang    
+Traffic request rate:                    20.0      
+Max request concurrency:                 64        
+Successful requests:                     100       
+Benchmark duration (s):                  17.78     
+Total input tokens:                      37136     
+Total input text tokens:                 37136     
+Total input vision tokens:               0         
+Total generated tokens:                  21239     
+Total generated tokens (retokenized):    21229     
+Request throughput (req/s):              5.62      
+Input token throughput (tok/s):          2088.54   
+Output token throughput (tok/s):         1194.49   
+Peak output token throughput (tok/s):    2524.00   
+Peak concurrent requests:                73        
+Total token throughput (tok/s):          3283.03   
+Concurrency:                             27.34     
+----------------End-to-End Latency----------------
+Mean E2E Latency (ms):                   4860.87   
+Median E2E Latency (ms):                 4199.54   
+---------------Time to First Token----------------
+Mean TTFT (ms):                          60.21     
+Median TTFT (ms):                        58.53     
+P99 TTFT (ms):                           87.60     
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          26.72     
+Median TPOT (ms):                        26.21     
+P99 TPOT (ms):                           40.74     
+---------------Inter-Token Latency----------------
+Mean ITL (ms):                           22.71     
+Median ITL (ms):                         22.68     
+P95 ITL (ms):                            43.49     
+P99 ITL (ms):                            66.56     
+Max ITL (ms):                            117.37    
+==================================================
+```
+
+```
+export SGLANG_MOE_DEBUG_FUSE=1
+export SGLANG_MOE_FUSE_DOWN_SUM_REDUCE=0
+bash scripts/launch_server_from_source.sh \
+    --model-path /root/model-download/hfd/OLMoE-1B-7B-0125 \
+    --moe-runner-backend triton \
+    --host 0.0.0.0 \
+    --port 30000
+```
+
+```
+============ Serving Benchmark Result ============
+Backend:                                 sglang    
+Traffic request rate:                    20.0      
+Max request concurrency:                 64        
+Successful requests:                     100       
+Benchmark duration (s):                  18.03     
+Total input tokens:                      37136     
+Total input text tokens:                 37136     
+Total input vision tokens:               0         
+Total generated tokens:                  21239     
+Total generated tokens (retokenized):    21226     
+Request throughput (req/s):              5.55      
+Input token throughput (tok/s):          2059.56   
+Output token throughput (tok/s):         1177.92   
+Peak output token throughput (tok/s):    2631.00   
+Peak concurrent requests:                75        
+Total token throughput (tok/s):          3237.48   
+Concurrency:                             28.74     
+----------------End-to-End Latency----------------
+Mean E2E Latency (ms):                   5182.70   
+Median E2E Latency (ms):                 4679.29   
+---------------Time to First Token----------------
+Mean TTFT (ms):                          98.44     
+Median TTFT (ms):                        86.20     
+P99 TTFT (ms):                           230.88    
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          30.84     
+Median TPOT (ms):                        28.58     
+P99 TPOT (ms):                           54.44     
+---------------Inter-Token Latency----------------
+Mean ITL (ms):                           24.06     
+Median ITL (ms):                         21.02     
+P95 ITL (ms):                            41.25     
+P99 ITL (ms):                            159.67    
+Max ITL (ms):                            305.00    
+==================================================
+============ Serving Benchmark Result ============
+Backend:                                 sglang    
+Traffic request rate:                    20.0      
+Max request concurrency:                 64        
+Successful requests:                     100       
+Benchmark duration (s):                  18.20     
+Total input tokens:                      37136     
+Total input text tokens:                 37136     
+Total input vision tokens:               0         
+Total generated tokens:                  21239     
+Total generated tokens (retokenized):    21226     
+Request throughput (req/s):              5.50      
+Input token throughput (tok/s):          2040.79   
+Output token throughput (tok/s):         1167.18   
+Peak output token throughput (tok/s):    2527.00   
+Peak concurrent requests:                72        
+Total token throughput (tok/s):          3207.97   
+Concurrency:                             27.95     
+----------------End-to-End Latency----------------
+Mean E2E Latency (ms):                   5085.74   
+Median E2E Latency (ms):                 4361.38   
+---------------Time to First Token----------------
+Mean TTFT (ms):                          68.61     
+Median TTFT (ms):                        69.27     
+P99 TTFT (ms):                           103.84    
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          28.98     
+Median TPOT (ms):                        27.88     
+P99 TPOT (ms):                           51.22     
+---------------Inter-Token Latency----------------
+Mean ITL (ms):                           23.74     
+Median ITL (ms):                         23.08     
+P95 ITL (ms):                            46.62     
+P99 ITL (ms):                            84.40     
+Max ITL (ms):                            150.75    
+==================================================
+============ Serving Benchmark Result ============
+Backend:                                 sglang    
+Traffic request rate:                    20.0      
+Max request concurrency:                 64        
+Successful requests:                     100       
+Benchmark duration (s):                  17.42     
+Total input tokens:                      37136     
+Total input text tokens:                 37136     
+Total input vision tokens:               0         
+Total generated tokens:                  21239     
+Total generated tokens (retokenized):    21227     
+Request throughput (req/s):              5.74      
+Input token throughput (tok/s):          2132.33   
+Output token throughput (tok/s):         1219.53   
+Peak output token throughput (tok/s):    2666.00   
+Peak concurrent requests:                72        
+Total token throughput (tok/s):          3351.87   
+Concurrency:                             27.24     
+----------------End-to-End Latency----------------
+Mean E2E Latency (ms):                   4744.28   
+Median E2E Latency (ms):                 4106.28   
+---------------Time to First Token----------------
+Mean TTFT (ms):                          62.61     
+Median TTFT (ms):                        63.47     
+P99 TTFT (ms):                           97.29     
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          27.01     
+Median TPOT (ms):                        25.38     
+P99 TPOT (ms):                           43.80     
+---------------Inter-Token Latency----------------
+Mean ITL (ms):                           22.15     
+Median ITL (ms):                         20.77     
+P95 ITL (ms):                            43.60     
+P99 ITL (ms):                            88.92     
+Max ITL (ms):                            151.78    
+==================================================
+```
+
+**加大prompt数量**
+
+```
+python -m sglang.bench_serving --backend sglang --host 127.0.0.1 --port 30000 --dataset-name sharegpt --dataset-path /root/model-download/hfd/ShareGPT_Vicuna_unfiltered/ShareGPT_V3_unfiltered_cleaned_split.json --num-prompts 1000 --request-rate 20 --max-concurrency 64 --seed 0 --warmup-requests 50
+```
+
+```
+export SGLANG_MOE_FUSE_DOWN_SUM_REDUCE=0
+============ Serving Benchmark Result ============
+Backend:                                 sglang    
+Traffic request rate:                    20.0      
+Max request concurrency:                 64        
+Successful requests:                     1000      
+Benchmark duration (s):                  113.97    
+Total input tokens:                      314096    
+Total input text tokens:                 314096    
+Total input vision tokens:               0         
+Total generated tokens:                  217170    
+Total generated tokens (retokenized):    215033    
+Request throughput (req/s):              8.77      
+Input token throughput (tok/s):          2755.88   
+Output token throughput (tok/s):         1905.45   
+Peak output token throughput (tok/s):    2555.00   
+Peak concurrent requests:                81        
+Total token throughput (tok/s):          4661.32   
+Concurrency:                             58.85     
+----------------End-to-End Latency----------------
+Mean E2E Latency (ms):                   6707.45   
+Median E2E Latency (ms):                 4916.21   
+---------------Time to First Token----------------
+Mean TTFT (ms):                          83.76     
+Median TTFT (ms):                        72.71     
+P99 TTFT (ms):                           208.35    
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          31.41     
+Median TPOT (ms):                        31.01     
+P99 TPOT (ms):                           49.88     
+---------------Inter-Token Latency----------------
+Mean ITL (ms):                           30.93     
+Median ITL (ms):                         23.21     
+P95 ITL (ms):                            69.42     
+P99 ITL (ms):                            131.23    
+Max ITL (ms):                            470.70    
+==================================================
+```
+
+```
+export SGLANG_MOE_FUSE_DOWN_SUM_REDUCE=1
+============ Serving Benchmark Result ============
+Backend:                                 sglang    
+Traffic request rate:                    20.0      
+Max request concurrency:                 64        
+Successful requests:                     1000      
+Benchmark duration (s):                  113.32    
+Total input tokens:                      314096    
+Total input text tokens:                 314096    
+Total input vision tokens:               0         
+Total generated tokens:                  217170    
+Total generated tokens (retokenized):    215031    
+Request throughput (req/s):              8.82      
+Input token throughput (tok/s):          2771.67   
+Output token throughput (tok/s):         1916.37   
+Peak output token throughput (tok/s):    2907.00   
+Peak concurrent requests:                82        
+Total token throughput (tok/s):          4688.04   
+Concurrency:                             58.84     
+----------------End-to-End Latency----------------
+Mean E2E Latency (ms):                   6668.29   
+Median E2E Latency (ms):                 4906.31   
+---------------Time to First Token----------------
+Mean TTFT (ms):                          84.01     
+Median TTFT (ms):                        72.41     
+P99 TTFT (ms):                           232.29    
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          31.34     
+Median TPOT (ms):                        30.84     
+P99 TPOT (ms):                           49.00     
+---------------Inter-Token Latency----------------
+Mean ITL (ms):                           30.75     
+Median ITL (ms):                         23.23     
+P95 ITL (ms):                            68.99     
+P99 ITL (ms):                            128.89    
+Max ITL (ms):                            473.63    
+==================================================
+```
+
+```
+python -m sglang.bench_serving --backend sglang --host 127.0.0.1 --port 30000 --dataset-name sharegpt --dataset-path /root/model-download/hfd/ShareGPT_Vicuna_unfiltered/ShareGPT_V3_unfiltered_cleaned_split.json --num-prompts 1000 --request-rate 100 --max-concurrency 256 --seed 0 --warmup-requests 50
+```
+
+```
+bash scripts/launch_server_from_source.sh   --model-path /root/model-download/hfd/OLMoE-1B-7B-0125   --moe-runner-backend triton   --cuda-graph-bs 64   --cuda-graph-max-bs 64   --host 0.0.0.0 --port 30000
+```
+
