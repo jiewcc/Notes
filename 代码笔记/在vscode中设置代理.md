@@ -9,3 +9,21 @@
 ### 容器中使用copilot就是会有问题
 
 [快速解决vscode远程连接时copilot提示脱机状态无法使用的问题](https://blog.csdn.net/messi10101010___/article/details/149963354)
+
+只需要在设置(setting)中搜索"extension kind"，点击settings.json；
+
+找到"remote.extensionKind"，加入如下"[Github](https://so.csdn.net/so/search?q=Github&spm=1001.2101.3001.7020)."开头的4行代码即可。
+
+```
+"remote.extensionKind": {
+  "Github.copilot": ["ui"],
+  "Github.copilot-chat": ["ui"],
+  "Github.copilot-labs": ["ui"],
+  "Github.copilot-chat-labs": ["ui"],
+  "Github.copilot-chat-completions": ["ui"],
+  "Github.copilot-chat-completions-labs": ["ui"],
+  "Github.copilot-chat-completions-remote": ["ui"],
+  "Github.copilot-chat-completions-remote-labs": ["ui"]
+}
+```
+
