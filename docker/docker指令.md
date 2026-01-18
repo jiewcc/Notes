@@ -88,7 +88,7 @@ docker run \                             # 基础命令：运行容器
 ```
 
 ```bash
-docker run \
+docker run -it\
     --gpus all \
     --shm-size 32g \
     -p 30000:30000 \
